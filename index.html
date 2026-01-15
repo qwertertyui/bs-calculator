@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ブラック–ショールズ計算機 | オプション価格シミュレーター</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; font-family: "Helvetica Neue", Arial, sans-serif; }
+        .calculator-card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-top: 20px; }
+        .result-box { background-color: #e9ecef; padding: 15px; border-radius: 8px; text-align: center; margin-top: 10px; }
+        .ad-space { width: 100%; height: 250px; background-color: #ddd; display: flex; align-items: center; justify-content: center; margin: 20px 0; border: 1px dashed #999; }
+        .btn-calc { width: 100%; font-weight: bold; padding: 12px; }
+    </style>
+</head>
+<body>
+
+<div class="container pb-5">
+    <h1 class="text-center mt-5 mb-4">ブラック–ショールズ計算機</h1>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            
+            <div class="ad-space">
+                <span class="text-muted">広告スペース (ここに動画広告が表示されます)</span>
+                </div>
+
+            <div class="calculator-card">
+                <form id="bsForm">
+                    <div class="mb-3">
+                        <label for="stockPrice" class="form-label">原資産価格 ($S$)</label>
+                        <input type="number" step="0.01" class="form-control" id="stockPrice" placeholder="例: 1000" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="strikePrice" class="form-label">権利行使価格 ($K$)</label>
+                        <input type="number" step="0.01" class="form-control" id="strikePrice" placeholder="例: 1000" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="timeToMaturity" class="form-label">満期までの期間 ($T$) <small class="text-muted">※年単位</small></label>
+                        <input type="number" step="0.01" class="form-control" id="timeToMaturity" placeholder="例: 1 (1年)" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="riskFreeRate" class="form-label">非危険利子率 ($r$) <small class="text-muted">※%表記</small></label>
+                        <input type="number" step="0.01" class="form-control" id="riskFreeRate" placeholder="例: 0.1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="volatility" class="form-label">ボラティリティ ($\sigma$) <small class="text-muted">※%表記</small></label>
+                        <input type="number" step="0.01" class="form-control" id="volatility" placeholder="例: 20" required>
+                    </div>
+
+                    <button type="button" class="btn btn-primary btn-calc mt-3" onclick="calculateBS()">計算する</button>
+                </form>
+
+                <div id="resultSection" class="mt-4" style="display:none;">
+                    <h4>計算結果</h4>
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="result-box border-success">
+                                <h5 class="text-success">コール (Call)</h5>
+                                <h3 id="callPrice">---</h3>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="result-box border-danger">
+                                <h5 class="text-danger">プット (Put)</h5>
+                                <h3 id="putPrice">---</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ad-space mt-4">
+                <span class="text-muted">広告スペース</span>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    // 標準正規分布の累積分布関数 (近似式)
+    function cnd(x) {
+        var a1 =  0.31938153, a2 = -0.356563782, a3 =  1.781477937, a4 = -1.821255978, a5 =  1.330274429;
+        var L = Math.abs(x);
+        var K = 1.0 / (1.0 + 0.2316419 * L);
+        var w = 1.0 - 1.0 / Math.sqrt(2.0 * Math.PI) * Math.exp(-L * L / 2.0) * (a1 * K + a2 * K * K + a3 * Math.pow(K,3) + a4 * Math.pow(K,4) + a5 * Math.pow(K,5));
+        if (x < 0.0) { return 1.0 - w; }
+        return w;
+    }
+
+    function calculateBS() {
+        // 入力値の取得
+        let S = parseFloat(document.getElementById('stockPrice').value);
+        let K = parseFloat(document.getElementById('strikePrice').value);
+        let T = parseFloat(document.getElementById('timeToMaturity').value);
+        let r = parseFloat(document.getElementById('riskFreeRate').value) / 100; // %を小数に変換
+        let v = parseFloat(document.getElementById('volatility').value) / 100;   // %を小数に変換
+
+        if (isNaN(S) || isNaN(K) || isNaN(T) || isNaN(r) || isNaN(v)) {
+            alert("すべての項目に数値を入力してください。");
+            return;
+        }
+
+        // d1, d2の計算
+        let d1 = (Math.log(S / K) + (r + (v * v) / 2.0) * T) / (v * Math.sqrt(T));
+        let d2 = d1 - v * Math.sqrt(T);
+
+        // Call, Putの計算
+        let callPrice = S * cnd(d1) - K * Math.exp(-r * T) * cnd(d2);
+        let putPrice = K * Math.exp(-r * T) * cnd(-d2) - S * cnd(-d1);
+
+        // 結果の表示
+        document.getElementById('callPrice').innerText = callPrice.toFixed(2);
+        document.getElementById('putPrice').innerText = putPrice.toFixed(2);
+        document.getElementById('resultSection').style.display = 'block';
+    }
+</script>
+
+</body>
+</html>
